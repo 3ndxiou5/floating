@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floating Sinyal XAU</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center h-screen p-6 text-center">
+
+    <div class="mb-8">
+        <img src="https://i.ibb.co.com/r2Jk6t89/sahabat-xau.png" alt="Logo" class="h-16 mx-auto mb-2">
+        <h1 class="text-2xl font-black text-yellow-400 tracking-wider">SAHABAT XAU FLOATING</h1>
+    </div>
+
+    <p class="mb-8 text-gray-400 text-sm leading-relaxed max-w-xs">
+        Tekan tombol di bawah untuk memunculkan Sinyal sebagai <b class="text-white">Video Melayang (PiP)</b>. Setelah muncul, usap ke layar utama (Home) dan buka aplikasi trading kamu!
+    </p>
+
+    <button id="pip-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.5)] transition transform active:scale-95 text-lg flex items-center gap-2">
+        <span>📺</span> Mulai Floating
+    </button>
+    
+    <div id="status" class="mt-6 text-xs text-gray-500 font-mono animate-pulse">Menyiapkan Mesin...</div>
+
+    <canvas id="pip-canvas" width="600" height="300" class="hidden"></canvas>
+    <video id="pip-video" autoplay muted playsinline class="hidden"></video>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbxveYF_Am4K-OqyHk9Lj1h5YioJ4lG68X6L7y_DGIh9GxHs4hIP7ATVRps9CtA6lfTQwA/exec";
+        
+        let currentMainSig = "⚪ NEUTRAL";
+        let currentAiSig = "🤖 AI: WAIT";
+        let currentExtra = "Memuat data...";
+        let isRed = false;
+        let isGreen = false;
+
+        // FUNGSI KHUSUS UNTUK MEMBUNGKUS TEKS PANJANG (WORD-WRAP) DI CANVAS
+        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            var words = text.split(' ');
+            var line = '';
+            var currentY = y;
+
+            for(var n = 0; n < words.length; n++) {
+                var testLine = line + words[n] + ' ';
+                var metrics = context.measureText(testLine);
+                var testWidth = metrics.width;
+                
+                if (testWidth > maxWidth && n > 0) {
+                    context.fillText(line, x, currentY);
+                    line = words[n] + ' ';
+                    currentY += lineHeight; // Pindah ke baris bawah
+                }
+                else {
+                    line = testLine;
+                }
+            }
+            context.fillText(line, x, currentY);
+        }
+
+        // 1. FUNGSI MENARIK DATA
+        async function fetchSignals() {
+            try {
+                document.getElementById('status').innerText = "Syncing...";
+                const response = await fetch(API_URL + "?t=" + new Date().getTime());
+                const data = await response.json();
+                let raw = Array.isArray(data) ? data[0] : (data.data ? data.data : data);
+                
+                if (!raw) return;
+
+                let lines = (raw.bot_teknikal || "").split('\n'); 
+                let mainSig = "⚪ NEUTRAL"; 
+                let aiSig = "🤖 AI: WAIT"; 
+                let macdStatus = ""; 
+                let extraTags = []; 
+
+                for (let l of lines) {
+                    let trimL = l.trim();
+                    if (trimL.includes('Skor:')) mainSig = trimL.replace(/\*\*/g, '').trim();
+                    else if (trimL.includes('🤖 AI:')) aiSig = trimL.replace(/\*\*/g, '').trim();
+                    else if (trimL.includes('MACD Hist')) {
+                        let match = trimL.match(/\((.*?)\)/);
+                        if (match) macdStatus = "MACD: " + match[1].replace(/🔺|🔻/g, '').trim();
+                    }
+                    else if (trimL.match(/🚀|🩸|🌟|☠️|⚠️|🔴|🟢|🔥|🐢|🌊|🧭|🔹|🎸|🧱|📦|🇪🇺|📏|💥/)) { 
+                        if(!trimL.includes('DISCLAIMER') && !trimL.includes('INGAT')) {
+                            if (trimL.match(/Oversold|Overbought|Cross|NEAR|Touch|BREAK|Drop|Jenuh/i)) {
+                                let parts = trimL.split('|');
+                                parts.forEach(p => {
+                                    let cleanP = p.replace(/🚀|🩸|🌟|☠️|⚠️|🔴|🟢|💥/g, '').replace(/!/g, '').trim();
+                                    if (cleanP.match(/Oversold|Overbought|Cross|NEAR|Touch|BREAK|Drop|Jenuh/i)) {
+                                        if (!extraTags.includes(cleanP) && cleanP !== "") extraTags.push(cleanP);
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                currentMainSig = mainSig;
+                currentAiSig = aiSig;
+                let tagsText = extraTags.length > 0 ? extraTags.join(" & ") : "Market Normal";
+                currentExtra = macdStatus + (macdStatus && tagsText ? " | " : "") + tagsText;
+
+                isGreen = mainSig.includes('BUY');
+                isRed = mainSig.includes('SELL');
+
+                document.getElementById('status').innerText = "Live Tracker Active (Data tersinkronisasi)";
+            } catch (e) { 
+                console.error(e); 
+                document.getElementById('status').innerText = "Koneksi terputus. Mencoba ulang...";
+            }
+        }
+
+        // 2. FUNGSI MENGGAMBAR TEKS
+        function drawCanvas() {
+            const canvas = document.getElementById('pip-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Latar Belakang Gelap
+            ctx.fillStyle = '#0b0e14';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Setting posisi teks ke tengah
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Gambar Main Signal 
+            if (isGreen) ctx.fillStyle = '#4ade80'; 
+            else if (isRed) ctx.fillStyle = '#ef4444'; 
+            else ctx.fillStyle = '#facc15'; 
+
+            ctx.font = '900 30px Arial, sans-serif';
+            ctx.fillText(currentMainSig, canvas.width / 2, canvas.height / 2 - 25);
+
+            // Gambar AI Signal 
+            ctx.fillStyle = '#e5e7eb'; 
+            ctx.font = 'bold 30px Arial, sans-serif';
+            ctx.fillText(currentAiSig, canvas.width / 2, canvas.height / 2 + 25);
+
+            // Gambar Extra Tags (DENGAN WRAP TEXT JIKA PANJANG)
+            ctx.fillStyle = '#60a5fa'; 
+            ctx.font = '20px "Courier New", monospace';
+            
+            // Gunakan fungsi wrapText yang baru dibuat
+            // Margin kiri-kanan adalah 20px (maxWidth = canvas.width - 40)
+            // Jarak antar baris adalah 22px
+            wrapText(ctx, currentExtra, canvas.width / 2, canvas.height - 60, canvas.width - 40, 22);
+            
+            // Indikator Titik Merah Berkedip
+            const time = new Date().getSeconds();
+            if (time % 2 === 0) {
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(40, 40, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.font = 'bold 18px Arial';
+                ctx.fillText('LIVE', 80, 40);
+            }
+
+            // Looping terus menerus
+            requestAnimationFrame(drawCanvas);
+        }
+
+        // 3. FUNGSI MEMICU PIP
+        const pipBtn = document.getElementById('pip-btn');
+        const video = document.getElementById('pip-video');
+        const canvas = document.getElementById('pip-canvas');
+
+        pipBtn.addEventListener('click', async () => {
+            try {
+                const stream = canvas.captureStream(30); 
+                video.srcObject = stream;
+                
+                await video.play();
+                video.requestPictureInPicture();
+            } catch (error) {
+                console.error("PiP error:", error);
+                alert("Gagal memulai PiP. Pastikan kamu membuka ini di browser Safari iPhone.");
+            }
+        });
+
+        // Jalankan Semuanya (Tetap 10 Detik)
+        fetchSignals();                   
+        setInterval(fetchSignals, 10000); 
+        drawCanvas();                     
+
+    </script>
+</body>
+</html>
