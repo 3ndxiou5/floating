@@ -72,12 +72,23 @@
                 let mainSig = "⚪ NEUTRAL"; 
                 let aiSig = "🤖 AI: WAIT"; 
                 let macdStatus = ""; 
+                let trendM15 = ""; // Variabel baru untuk menampung Trend M15
                 let extraTags = []; 
 
                 for (let l of lines) {
                     let trimL = l.trim();
                     if (trimL.includes('Skor:')) mainSig = trimL.replace(/\*\*/g, '').trim();
                     else if (trimL.includes('🤖 AI:')) aiSig = trimL.replace(/\*\*/g, '').trim();
+                    else if (trimL.includes('Trend M15')) {
+                        // Ekstrak data tren M15
+                        let parts = trimL.split(':');
+                        if(parts.length > 1) {
+                            let trendRaw = parts[1].replace(/📉|📈/g, '').trim(); 
+                            // Ubah BEARISH jadi BEAR, BULLISH jadi BULL
+                            let shortTrend = trendRaw.includes('BEAR') ? 'BEAR' : (trendRaw.includes('BULL') ? 'BULL' : trendRaw);
+                            trendM15 = "📊 M15: " + shortTrend;
+                        }
+                    }
                     else if (trimL.includes('MACD Hist')) {
                         let match = trimL.match(/\((.*?)\)/);
                         if (match) macdStatus = "MACD: " + match[1].replace(/🔺|🔻/g, '').trim();
@@ -98,7 +109,12 @@
                 }
                 
                 currentMainSig = mainSig;
-                currentAiSig = aiSig;
+                // Gabungkan teks AI dan M15 jika datanya ada
+                if (trendM15 !== "") {
+                    currentAiSig = aiSig + " | " + trendM15;
+                } else {
+                    currentAiSig = aiSig;
+                }
                 let tagsText = extraTags.length > 0 ? extraTags.join(" & ") : "Market Normal";
                 currentExtra = macdStatus + (macdStatus && tagsText ? " | " : "") + tagsText;
 
@@ -135,7 +151,7 @@
 
             // Gambar AI Signal 
             ctx.fillStyle = '#e5e7eb'; 
-            ctx.font = 'bold 30px Arial, sans-serif';
+            ctx.font = 'bold 28px Arial, sans-serif';
             ctx.fillText(currentAiSig, canvas.width / 2, canvas.height / 2 + 25);
 
             // Gambar Extra Tags (DENGAN WRAP TEXT JIKA PANJANG)
