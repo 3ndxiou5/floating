@@ -72,7 +72,7 @@
                 let mainSig = "⚪ NEUTRAL"; 
                 let aiSig = "🤖 AI: WAIT"; 
                 let macdStatus = ""; 
-                let trendM15 = ""; // Variabel baru untuk menampung Trend M15
+                let trendM15 = ""; // Variabel penampung Trend M15
                 let extraTags = []; 
 
                 for (let l of lines) {
@@ -84,7 +84,6 @@
                         let parts = trimL.split(':');
                         if(parts.length > 1) {
                             let trendRaw = parts[1].replace(/📉|📈/g, '').trim(); 
-                            // Ubah BEARISH jadi BEAR, BULLISH jadi BULL
                             let shortTrend = trendRaw.includes('BEAR') ? 'BEAR' : (trendRaw.includes('BULL') ? 'BULL' : trendRaw);
                             trendM15 = "📊 M15: " + shortTrend;
                         }
@@ -108,13 +107,13 @@
                     }
                 }
                 
-                currentMainSig = mainSig;
-                // Gabungkan teks AI dan M15 jika datanya ada
+                // PENGGABUNGAN TEKS (Aman di luar Loop)
                 if (trendM15 !== "") {
                     currentAiSig = aiSig + " | " + trendM15;
                 } else {
                     currentAiSig = aiSig;
                 }
+
                 let tagsText = extraTags.length > 0 ? extraTags.join(" & ") : "Market Normal";
                 currentExtra = macdStatus + (macdStatus && tagsText ? " | " : "") + tagsText;
 
